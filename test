@@ -10,8 +10,8 @@ local Visuals = {
     LINE_THICKNESS = 0.28, 
     SHRINK_AMOUNT = 0.15, 
     GLOW_RADIUS = 0.55,
-    GLOW_TRANSPARENCY = 0.4,
-    SMOOTH_SPEED = 0.01, -- Плавность проявления/затухания
+    GLOW_TRANSPARENCY = 0.15,
+    SMOOTH_SPEED = 0.8, -- Плавность проявления/затухания
     MIN_DIST = 10,       -- Расстояние, где видимость 100%
     MAX_DIST = 50       -- Расстояние, где видимость 0%
 }
