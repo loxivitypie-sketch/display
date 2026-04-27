@@ -11,9 +11,9 @@ local Visuals = {
     SHRINK_AMOUNT = 0.15, 
     GLOW_RADIUS = 0.55,
     GLOW_TRANSPARENCY = 0.4,
-    SMOOTH_SPEED = 0.16, -- Плавность проявления/затухания
-    MIN_DIST = 30,       -- Расстояние, где видимость 100%
-    MAX_DIST = 140       -- Расстояние, где видимость 0%
+    SMOOTH_SPEED = 0.01, -- Плавность проявления/затухания
+    MIN_DIST = 10,       -- Расстояние, где видимость 100%
+    MAX_DIST = 50       -- Расстояние, где видимость 0%
 }
 
 local Prefs = { 
