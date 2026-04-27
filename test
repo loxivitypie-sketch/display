@@ -5,14 +5,15 @@ local _UI = game:GetService("UserInputService")
 local LocalPlayer = _P.LocalPlayer -- Required for the watermark
 
 local Visuals = {
-    M_COL = Color3.fromRGB(255, 55, 55),
-    S_COL = Color3.fromRGB(35, 150, 255),
+    M_COL = Color3.fromRGB(255, 135, 130), -- Мягкий коралловый (мины)
+    S_COL = Color3.fromRGB(110, 205, 255), -- Небесно-голубой (безопасно)
     LINE_THICKNESS = 0.28, 
     SHRINK_AMOUNT = 0.15, 
-    GLOW_RADIUS = 0.45,
-    GLOW_TRANSPARENCY = 0.65,
-    PULSE_SPEED = 3.2,
-    SMOOTH_SPEED = 0.18 -- Factor for smooth transparency/color transitions
+    GLOW_RADIUS = 0.55,
+    GLOW_TRANSPARENCY = 0.4,
+    SMOOTH_SPEED = 0.16, -- Плавность проявления/затухания
+    MIN_DIST = 30,       -- Расстояние, где видимость 100%
+    MAX_DIST = 140       -- Расстояние, где видимость 0%
 }
 
 local Prefs = { 
@@ -26,9 +27,9 @@ local Memory = {
     Count = -1,
     Pending = false,
     Links = {},
-    CleanupQueue = {}, -- Prevents memory leaks by tracking old dummies
-    LastGridState = nil, -- Smart memory: avoids redundant scans
-    ActiveDummies = {}   -- Cache for safe cleanup
+    CleanupQueue = {},
+    LastGridState = nil,
+    ActiveDummies = {}
 }
 
 local m_abs, m_floor, m_huge = math.abs, math.floor, math.huge
@@ -63,7 +64,6 @@ local function RefreshBox(obj, mode)
         local edges = {}
         obj._edges = edges
         
-        -- Smart memory: track for cleanup
         table.insert(Memory.ActiveDummies, dummy)
 
         local sx, sy, sz = dummy.Size.X, dummy.Size.Y, dummy.Size.Z
@@ -103,9 +103,8 @@ end
 local function RefreshOutline(unit)
     if not unit._edges then return end
     
-    -- Initialize smooth state cache if missing
     if not unit._vis then 
-        unit._vis = { trans = 1, r = 1, g = 1, b = 1, pulse = 0 } 
+        unit._vis = { trans = 1, r = 1, g = 1, b = 1 } 
     end
 
     -- CRITICAL FIX: If the tile is revealed (not hidden), force all lines to vanish
@@ -113,7 +112,7 @@ local function RefreshOutline(unit)
         for name, edge in pairs(unit._edges) do
             local glow = name:find("_Glow")
             if glow then
-                edge.Transparency = math.max(edge.Transparency - 0.15, 0.8)
+                edge.Transparency = math.max(edge.Transparency - 0.1, 0.85)
             else
                 edge.Transparency = math.min(edge.Transparency + 0.2, 1)
             end
@@ -124,7 +123,14 @@ local function RefreshOutline(unit)
 
     local c = unit.lastMode
     local targetCol = (c == "mine" and Visuals.M_COL) or Visuals.S_COL
-    local pulse = (math.sin(os.clock() * Visuals.PULSE_SPEED) * 0.5 + 0.5) * 0.12
+
+    -- Distance-based visibility fade
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local pPos = root and root.Position or Vector3.new(0,0,0)
+    local uPos = unit.pos or Vector3.new(0,0,0)
+    local dist = (pPos - uPos).Magnitude
+    local fade = math.clamp((dist - Visuals.MIN_DIST) / (Visuals.MAX_DIST - Visuals.MIN_DIST), 0, 1)
+    local baseTrans = fade -- 0 рядом, 1 далеко
 
     local function isSameGroup(nx, nz)
         local n = Memory.Map.Grid[nx] and Memory.Map.Grid[nx][nz]
@@ -143,13 +149,13 @@ local function RefreshOutline(unit)
         local glow = unit._edges[name .. "_Glow"]
         if not e then return end
         
-        local targetT = show and (0.05 + pulse) or 1
         local step = Visuals.SMOOTH_SPEED
+        local targetT = show and baseTrans or 1
         
         -- Smooth transparency transition
         e.Transparency = e.Transparency + (targetT - e.Transparency) * step
         if glow then
-            glow.Transparency = show and (Visuals.GLOW_TRANSPARENCY + pulse * 0.5) or 1
+            glow.Transparency = show and (Visuals.GLOW_TRANSPARENCY + baseTrans * 0.5) or 1
             -- Smooth color transition
             glow.Color3 = Color3.new(
                 glow.Color3.R + (targetCol.R - glow.Color3.R) * step,
@@ -554,13 +560,12 @@ local function SetupWatermark()
     sg.IgnoreGuiInset = true
     sg.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-    -- Modern pill background
     local bg = Instance.new("Frame")
     bg.Name = "Background"
-    bg.Size = UDim2.new(0, 210, 0, 26)
-    bg.Position = UDim2.new(1, -218, 1, -36)
-    bg.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
-    bg.BackgroundTransparency = 0.25
+    bg.Size = UDim2.new(0, 200, 0, 26)
+    bg.Position = UDim2.new(1, -208, 1, -36)
+    bg.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+    bg.BackgroundTransparency = 0.2
     bg.BorderSizePixel = 0
     bg.Parent = sg
     
@@ -569,37 +574,36 @@ local function SetupWatermark()
     corner.Parent = bg
 
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(40, 40, 50)
+    stroke.Color = Color3.fromRGB(45, 45, 55)
     stroke.Thickness = 1
-    stroke.Transparency = 0.6
+    stroke.Transparency = 0.5
     stroke.Parent = bg
 
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, 0, 1, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = "Foolisher1 Solver"
-    lbl.TextColor3 = Color3.fromRGB(240, 230, 200)
+    lbl.TextColor3 = Color3.fromRGB(230, 235, 245)
     lbl.TextSize = 12
     lbl.Font = Enum.Font.GothamSemibold
     lbl.TextXAlignment = Enum.TextXAlignment.Center
-    lbl.TextStrokeTransparency = 0.7
+    lbl.TextStrokeTransparency = 0.65
     lbl.Parent = bg
 
     local grad = Instance.new("UIGradient")
     grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(80, 50, 30)),
-        ColorSequenceKeypoint.new(0.3, Color3.fromRGB(160, 110, 50)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 200, 110)),
-        ColorSequenceKeypoint.new(0.7, Color3.fromRGB(160, 110, 50)),
-        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(80, 50, 30)),
+        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(90, 60, 130)),
+        ColorSequenceKeypoint.new(0.4, Color3.fromRGB(110, 200, 240)),
+        ColorSequenceKeypoint.new(0.6, Color3.fromRGB(255, 140, 130)),
+        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(90, 60, 130)),
     })
     grad.Rotation = 0
     grad.Parent = lbl
 
     local _t = 0
     _RS.Heartbeat:Connect(function(dt)
-        _t += dt * 50
-        grad.Offset = Vector2.new(math.sin(math.rad(_t)) * 0.5, 0)
+        _t += dt * 45
+        grad.Offset = Vector2.new(math.sin(math.rad(_t)) * 0.4, 0)
     end)
 end
 
