@@ -15,12 +15,12 @@ local Config = {
         ShrinkAmount = 0.15,
     },
     Solver = {
-        MaxPasses = 100,          -- Лимит циклов солвера (защита от зависаний)
-        MaxDeepSteps = 15000,     -- Лимит рекурсии в DeepSearch
-        ClusterSizeLimit = 20,    -- Макс. размер кластера для брутфорса
+        MaxPasses = 100,
+        MaxDeepSteps = 15000,
+        ClusterSizeLimit = 20,
     },
     Map = {
-        CoordTolerance = 2,       -- Допустимое расстояние между центрами тайлов
+        CoordTolerance = 2,
         TotalMines = 100,
     }
 }
@@ -38,6 +38,12 @@ local Memory = {
 local m_abs, m_floor, m_huge = math.abs, math.floor, math.huge
 local t_sort = table.sort
 local t_insert = table.insert
+
+-- Безопасный запуск потока (совместим со всеми экзекьюторами)
+local function SafeSpawn(fn)
+    if task and task.spawn then task.spawn(fn)
+    else local co = coroutine.create(fn); coroutine.resume(co) end
+end
 
 -- ==========================================
 -- VISUALS & CLEANUP
@@ -59,7 +65,6 @@ local function RefreshBox(unit, mode)
     CleanupVisuals(unit)
     if mode == "none" then return end
 
-    -- Create visual host (properties set BEFORE parenting for performance)
     local dummy = Instance.new("Part")
     dummy.Name = "SolverVisual"
     dummy.Size = unit.part.Size - Vector3.new(Config.Visuals.ShrinkAmount, 0.05, Config.Visuals.ShrinkAmount)
@@ -112,7 +117,8 @@ local function RefreshOutline(unit)
     local col = (c == "mine" and Config.Colors.Mine) or Config.Colors.Safe
 
     local function isSameGroup(nx, nz)
-        local n = Memory.Map.Grid[nx] and Memory.Map.Grid[nx][nz]
+        local row = Memory.Map.Grid[nx]
+        local n = row and row[nz]
         return n and n.lastMode == c and n.hidden
     end
 
@@ -206,20 +212,26 @@ local function MapOutEnvironment(src)
             local dist = m_abs(d.loc.Z - v)
             if dist < dZ then dZ = dist; rZ = i end 
         end
-        local unit = Memory.Map.Grid[rX-1][rZ-1]
-        unit.part = d.obj
-        unit.pos = d.loc
+        local row = Memory.Map.Grid[rX-1]
+        if row then
+            local unit = row[rZ-1]
+            unit.part = d.obj
+            unit.pos = d.loc
+        end
     end
 
     for x = 0, Memory.Bounds.X - 1 do
+        local row = Memory.Map.Grid[x]
+        if not row then continue end
         for z = 0, Memory.Bounds.Z - 1 do
-            local unit = Memory.Map.Grid[x][z]
+            local unit = row[z]
             for ox = -1, 1 do
                 for oz = -1, 1 do
                     if ox ~= 0 or oz ~= 0 then
                         local nx, nz = x + ox, z + oz
-                        if Memory.Map.Grid[nx] and Memory.Map.Grid[nx][nz] then
-                            t_insert(unit.adj, Memory.Map.Grid[nx][nz])
+                        local nRow = Memory.Map.Grid[nx]
+                        if nRow and nRow[nz] then
+                            t_insert(unit.adj, nRow[nz])
                         end
                     end
                 end
@@ -232,8 +244,10 @@ end
 local function ScanGrid()
     Memory.Map.Marked = {}
     for x = 0, Memory.Bounds.X - 1 do
+        local row = Memory.Map.Grid[x]
+        if not row then continue end
         for z = 0, Memory.Bounds.Z - 1 do
-            local unit = Memory.Map.Grid[x][z]
+            local unit = row[z]
             local p = unit.part
             if p then
                 local ui = p:FindFirstChild("NumberGui") or p:FindFirstChild("numbergui")
@@ -368,7 +382,9 @@ local function DeepSearch(foundMines, toOpen)
             for _, c in ipairs(bundle) do totalMines[c] = 0 end
             local steps = 0
 
-            local function Recursive(step)
+            -- Явное объявление рекурсии для совместимости со строгим режимом
+            local Recursive
+            Recursive = function(step)
                 steps += 1
                 if steps > Config.Solver.MaxDeepSteps then return end
                 if step > #bundle then
@@ -379,6 +395,7 @@ local function DeepSearch(foundMines, toOpen)
 
                 local target = bundle[step]
                 
+                -- Try Safe
                 foundMines[target] = false
                 local okS = true
                 for _, a in ipairs(bundleNums) do
@@ -387,16 +404,17 @@ local function DeepSearch(foundMines, toOpen)
                         if foundMines[u] == true then cur += 1
                         elseif foundMines[u] == nil then pot += 1 end
                     end
-                    if cur + pot < a.gap then okS = false; break end
+                    if cur + pot < a.gap then okS = false break end
                 end
                 if okS then Recursive(step + 1) end
 
+                -- Try Mine
                 foundMines[target] = true
                 local okM = true
                 for _, a in ipairs(bundleNums) do
                     local cur = 0
                     for _, u in ipairs(a.unk) do if foundMines[u] == true then cur += 1 end end
-                    if cur > a.gap then okM = false; break end
+                    if cur > a.gap then okM = false break end
                 end
                 if okM then Recursive(step + 1) end
                 
@@ -420,8 +438,10 @@ end
 local function Compute()
     local foundMines, toOpen = {}, {}
     for x = 0, Memory.Bounds.X - 1 do
+        local row = Memory.Map.Grid[x]
+        if not row then continue end
         for z = 0, Memory.Bounds.Z - 1 do
-            local unit = Memory.Map.Grid[x][z]
+            local unit = row[z]
             if not unit.hidden then toOpen[unit] = nil 
             elseif unit.status == "flagged" or (Memory.Map.ToFlag and Memory.Map.ToFlag[unit]) then foundMines[unit] = true end
         end
@@ -435,8 +455,10 @@ local function Compute()
         if Config.Map.TotalMines and Config.Map.TotalMines > 0 then
             local fCount, unks = 0, {}
             for x = 0, Memory.Bounds.X - 1 do
+                local row = Memory.Map.Grid[x]
+                if not row then continue end
                 for z = 0, Memory.Bounds.Z - 1 do
-                    local u = Memory.Map.Grid[x][z]
+                    local u = row[z]
                     if foundMines[u] or u.status == "flagged" then fCount += 1
                     elseif u.hidden and not toOpen[u] then t_insert(unks, u) end
                 end
@@ -513,7 +535,7 @@ end
 SetupWatermark()
 
 -- ==========================================
--- MAIN LOOP (THROTTLED & SAFE)
+-- MAIN LOOP
 -- ==========================================
 _RS.Heartbeat:Connect(function()
     local folder = _W:FindFirstChild("Flag") and _W.Flag:FindFirstChild("Parts")
@@ -529,15 +551,17 @@ _RS.Heartbeat:Connect(function()
         Memory.Pending = false
         Memory.SolverActive = true
         
-        task.spawn(function()
-            ScanGrid()
-            Compute()
+        SafeSpawn(function()
+            pcall(ScanGrid)
+            pcall(Compute)
             
-            -- Apply visuals safely off the main thread heartbeat
+            -- Apply visuals
             for x = 0, Memory.Bounds.X - 1 do
+                local row = Memory.Map.Grid[x]
+                if not row then continue end
                 for z = 0, Memory.Bounds.Z - 1 do
-                    local unit = Memory.Map.Grid[x][z]
-                    if unit.part then
+                    local unit = row[z]
+                    if unit and unit.part then
                         if Memory.Map.ToFlag[unit] then RefreshBox(unit, "mine")
                         elseif Memory.Map.ToClear[unit] then RefreshBox(unit, "safe")
                         else RefreshBox(unit, "none") end
@@ -546,9 +570,11 @@ _RS.Heartbeat:Connect(function()
             end
             
             for x = 0, Memory.Bounds.X - 1 do
+                local row = Memory.Map.Grid[x]
+                if not row then continue end
                 for z = 0, Memory.Bounds.Z - 1 do
-                    local unit = Memory.Map.Grid[x][z]
-                    if unit.part then RefreshOutline(unit) end
+                    local unit = row[z]
+                    if unit and unit.part then RefreshOutline(unit) end
                 end
             end
             Memory.SolverActive = false
